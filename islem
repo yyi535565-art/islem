@@ -1,0 +1,59 @@
+
+name: Project-Build-Environment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 360
+
+    steps:
+      - name: Initialize Environment
+        shell: powershell
+        run: |
+          Write-Host "Initializing Windows..."
+          Write-Host "Windows environment is ready."
+
+      - name: Install Tailscale
+        shell: powershell
+        run: |
+          $url = "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe"
+          Invoke-WebRequest -Uri $url -OutFile "$env:TEMP\tailscale.exe"
+          Start-Process "$env:TEMP\tailscale.exe" -ArgumentList "/S" -Wait
+          Write-Host "Tailscale installation completed."
+
+      - name: Network Connectivity
+        shell: powershell
+        env:
+          TS_KEY: ${{ secrets.TAILSCALE_KEY }}
+        run: |
+          if (-not $env:TS_KEY) {
+            throw "Missing TAILSCALE_KEY secret"
+          }
+
+          Start-Sleep -Seconds 10
+
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey $env:TS_KEY --accept-dns=false
+
+          & "C:\Program Files\Tailscale\tailscale.exe" status
+
+      - name: Install Google Chrome
+        shell: powershell
+        run: |
+          $Path = "$env:TEMP\chrome.exe"
+
+          Invoke-WebRequest `
+            -Uri "https://dl.google.com/chrome/install/latest/chrome_installer.exe" `
+            -OutFile $Path
+
+          Start-Process -FilePath $Path -ArgumentList "/silent /install" -Wait
+
+          Write-Host "Chrome installation completed."
+
+      - name: Environment Check
+        shell: powershell
+        run: |
+          Write-Host "Windows environment is ready."
+          Write-Host "Workflow completed successfully."
