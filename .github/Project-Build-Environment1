@@ -1,0 +1,37 @@
+name: Project-Build-Environment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  windows-check:
+    # GitHub-hosted Windows runners have fixed hardware allocations.
+    # The standard hosted-runner job limit is 6 hours.
+    runs-on: windows-2022
+    timeout-minutes: 360
+
+    steps:
+      - name: Show runner information
+        shell: pwsh
+        run: |
+          Write-Host "Windows runner information"
+          Get-ComputerInfo |
+            Select-Object WindowsProductName, WindowsVersion, OsArchitecture
+          Write-Host "Logical processors:"
+          (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
+          Write-Host "Total RAM (GB):"
+          [math]::Round(
+            (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 2
+          )
+
+      - name: Check Remote Desktop service
+        shell: pwsh
+        run: |
+          $service = Get-Service -Name TermService -ErrorAction Stop
+          Write-Host "Remote Desktop Services status: $($service.Status)"
+          Write-Host "This job only checks the runner; it does not expose an RDP login."
+
+      - name: Finish
+        shell: pwsh
+        run: |
+          Write-Host "Windows runner check completed."
