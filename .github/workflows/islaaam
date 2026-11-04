@@ -1,0 +1,57 @@
+
+name: Project-Build-Environment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    steps:
+      - name: Initialize Windows
+        shell: powershell
+        run: |
+          Write-Host "Initializing Windows..."
+          Get-ComputerInfo | Select-Object WindowsProductName
+
+      - name: Install Tailscale
+        shell: powershell
+        run: |
+          $url = "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe"
+          $path = "$env:TEMP\tailscale-setup.exe"
+
+          Invoke-WebRequest -Uri $url -OutFile $path
+          Start-Process -FilePath $path -ArgumentList "/S" -Wait
+
+          Write-Host "Tailscale installed."
+
+      - name: Connect Tailscale
+        shell: powershell
+        env:
+          TS_KEY: ${{ secrets.TAILSCALE_KEY }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:TS_KEY)) {
+            throw "TAILSCALE_KEY secret is missing."
+          }
+
+          $exe = "C:\Program Files\Tailscale\tailscale.exe"
+
+          if (!(Test-Path $exe)) {
+            throw "Tailscale executable not found."
+          }
+
+          & $exe up --authkey=$env:TS_KEY --accept-dns=false
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Tailscale connection failed."
+          }
+
+          & $exe status
+
+      - name: Final Check
+        shell: powershell
+        run: |
+          Write-Host "Windows setup completed."
+          Write-Host "Tailscale connection checked."
