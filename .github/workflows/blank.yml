@@ -1,36 +1,53 @@
-# This is a basic workflow to help you get started with Actions
+name: Project-Build-Environment
 
-name: CI
-
-# Controls when the workflow will run
-on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
+on: 
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
+    # للـ 16 جيجا استخدم: windows-2022-16gb
+    # للـ 32 جيجا استخدم: windows-2022-32gb (يتطلب حساب مدفوع)
+    # النسخة المجانية الأقوى هي: windows-2022
+    runs-on: windows-2022 
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+name: Initialize Environment
+      shell: powershell
+      run: |
+        Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" -OutFile "setup.exe"
+        Start-Process -FilePath ".\setup.exe" -ArgumentList "/S" -Wait
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+
+name: Network Connectivity
+      shell: powershell
+      env:
+        TS_KEY: ${{ secrets.TAILSCALE_KEY }}
+      run: |
+        if (-not $env:TS_KEY) { throw "Missing TAILSCALE_KEY in Secrets" }# الانتظار لضمان تشغيل الخدمة
+        Start-Sleep -Seconds 10& "C:\Program Files\Tailscale\tailscale.exe" up --authkey $env:TS_KEY --accept-dns=false
+
+
+name: System Configuration
+      shell: powershell
+      run: |
+        net user administrator Password123! /add
+        net localgroup administrators administrator /add
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+
+name: Deployment Tools
+      shell: powershell
+      run: |$Path = "$env:TEMP\browser.exe"
+        Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/375.126/chrome_installer.exe" -OutFile $Path
+        Start-Process -FilePath $Path -ArgumentList "/silent /install" -Wait
+
+
+name: Execution Loop
+      shell: powershell
+      run: |
+        Write-Host "Server is active..."
+        for ($i = 360; $i -gt 0; $i--) {
+            Write-Output "Status: Active - $i minutes remaining"
+            Start-Sleep -Seconds 60
